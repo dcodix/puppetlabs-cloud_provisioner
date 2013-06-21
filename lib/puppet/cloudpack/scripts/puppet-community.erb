@@ -5,6 +5,17 @@
 set -u
 set -e
 
+function set_releasever_puppetlab() {
+# Create a variable for you to puppetlabs release version in yum
+# At least for Scrientific Linux $releaseversion is not only the major number.
+PUPPETLABSRELEASEVER=$(rpm -q --qf "%{VERSION}" $(rpm -q --whatprovides redhat-release))
+if [ $(grep -iq "scientific linux" /etc/redhat-release|wc -l) -lt 1 ]; then
+{
+	PUPPETLABSRELEASEVER=$(rpm -q --qf "%{VERSION}" $(rpm -q --whatprovides redhat-release)|awk -F . '{print $1}')
+}; fi
+echo ${PUPPETLABSRELEASEVER} > /etc/yum/vars/puppetlabsreleasever
+}
+
 function fedora_repo() {
   cat >/etc/yum.repos.d/puppet.repo <<'EOFYUMREPO'
 [puppetlabs]
@@ -20,13 +31,13 @@ function el_repo() {
   cat >/etc/yum.repos.d/puppet.repo <<'EOFYUMREPO'
 [puppetlabs]
 name = Puppetlabs
-baseurl = http://yum.puppetlabs.com/el/$releasever/products/$basearch/
+baseurl = http://yum.puppetlabs.com/el/$puppetlabsreleasever/products/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
 [puppetlabs-deps]
 name = Puppetlabs Dependencies
-baseurl = http://yum.puppetlabs.com/el/$releasever/dependencies/$basearch/
+baseurl = http://yum.puppetlabs.com/el/$puppetlabsreleasever/dependencies/$basearch/
 gpgcheck = 1
 enabled = 1
 gpgkey = http://yum.puppetlabs.com/RPM-GPG-KEY-puppetlabs
@@ -34,6 +45,9 @@ EOFYUMREPO
 }
 
 function rpm_install() {
+  # Set releasever. In case of Scientific Linux releasever is "major.minor", not only "major"
+  set_releasever_puppetlab
+
   # Setup the yum Puppet repository
   rpm -q fedora-release && fedora_repo || el_repo
 
